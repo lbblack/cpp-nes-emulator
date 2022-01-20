@@ -105,7 +105,7 @@ uint16_t nes_cpu::get_indirect(uint16_t addr)
 {
     uint16_t value = (uint16_t) read_mem_from_address(addr);
     uint16_t high_nibble = value;
-    value = (uint16_t) read_mem_from_address(addr +1 1);
+    value = (uint16_t) read_mem_from_address(addr + 1);
     uint16_t low_nibble = value;
 
     return (low_nibble << 8) & high_nibble;
@@ -787,41 +787,51 @@ void nes_cpu::TYA(uint8_t cycle_count)
     A = Y;
 }
 
-void execute_implied_instruction(void (*opcode_function)(uint8_t),
+void nes_cpu::execute_implied_instruction(void (nes_cpu::*opcode_function)(uint8_t),
     uint8_t cycle_count)
 {
-    (*opcode_function)(cycle_count);
+    (this->*opcode_function)(cycle_count);
     PC++;
 }
 
-void execute_instruction_with_bool(
-    void(*opcode_function)(uint16_t, uint8_t, bool),
-    uint8_t instruction_length,
-    uint8_t cycle_count,
-    bool parameter_flag)
-{
-    (*opcode_function)(-1, cycle_count, parameter_flag);
-    PC += instruction_length;
-}
-
-void execute_instruction_with_bool_and_address(
-    void(*opcode_function)(uint16_t, uint8_t, bool),
-    void(*addressing_function)(uint16_t),
-    uint8_t instruction_length,
-    uint8_t cycle_count,
-    bool parameter_flag)
-{
-    (*opcode_function)((*addressing_function)(PC + 1), cycle_count, parameter_flag);
-    PC += instruction_length;
-}
-
-void execute_instruction(
-    void(*opcode_function)(uint16_t, uint8_t, bool),
-    void(*addressing_function)(uint16_t),
+void nes_cpu::execute_relative_instruction(
+    void (nes_cpu::*opcode_function)(uint16_t, uint8_t),
     uint8_t instruction_length,
     uint8_t cycle_count)
 {
-    (*opcode_function)((*addressing_function)(PC + 1), cycle_count);
+    (this->*opcode_function)(PC + 1, cycle_count);
+    PC += instruction_length;
+}
+
+void nes_cpu::execute_instruction_with_bool(
+    void (nes_cpu::*opcode_function)(uint16_t, uint8_t, bool),
+    uint8_t instruction_length,
+    uint8_t cycle_count,
+    bool parameter_flag)
+{
+    (this->*opcode_function)(-1, cycle_count, parameter_flag);
+    PC += instruction_length;
+}
+
+void nes_cpu::execute_instruction_with_bool_and_address(
+    void (nes_cpu::*opcode_function)(uint16_t, uint8_t, bool),
+    uint16_t (nes_cpu::*addressing_function)(uint16_t),
+    uint8_t instruction_length,
+    uint8_t cycle_count,
+    bool parameter_flag)
+{
+    (this->*opcode_function)((this->*addressing_function)(PC + 1),
+        cycle_count, parameter_flag);
+    PC += instruction_length;
+}
+
+void nes_cpu::execute_instruction(
+    void (nes_cpu::*opcode_function)(uint16_t, uint8_t),
+    uint16_t (nes_cpu::*addressing_function)(uint16_t),
+    uint8_t instruction_length,
+    uint8_t cycle_count)
+{
+    (this->*opcode_function)((this->*addressing_function)(PC + 1), cycle_count);
     PC += instruction_length;
 }
 
@@ -830,700 +840,567 @@ void execute_instruction(
 //       the correct number of bytes
 // todo: check every instruction is using the correct addressing mode
 // todo: check every instruction has the correct HEX opcode
+
 bool nes_cpu::step()
 {
     switch(read_mem_from_address(PC)) {
         case 0x69:
-            ADC(get_immediate(PC + 1), 2);
-            PC += 2;
+            execute_instruction(&nes_cpu::ADC, &nes_cpu::get_immediate, 2, 2);
             break;
         case 0x65:
-            ADC(get_zeropage(PC + 1), 3);
-            PC += 2;
+            execute_instruction(&nes_cpu::ADC, &nes_cpu::get_zeropage, 2, 3);
             break;
         case 0x75:
-            ADC(get_zeropage_x(PC + 1), 4);
-            PC += 2;
+            execute_instruction(&nes_cpu::ADC, &nes_cpu::get_zeropage_x, 2, 4);
             break;
         case 0x6D:
-            ADC(get_absolute(PC + 1), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::ADC, &nes_cpu::get_absolute, 3, 4);
             break;
         case 0x7D:
             // todo: add another cycle on page boundry cross
-            ADC(get_absolute_x(PC + 1), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::ADC, &nes_cpu::get_absolute_x, 3, 4);
             break;
         case 0x79:
             // todo: add another cycle on page boundry cross
-            ADC(get_absolute_y(PC + 1), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::ADC, &nes_cpu::get_absolute_y, 3, 4);
             break;
         case 0x61:
-            ADC(get_indirect_x(PC + 1), 6);
-            PC += 2;
+            execute_instruction(&nes_cpu::ADC, &nes_cpu::get_indirect_y, 2, 6);
             break;
         case 0x71:
             // todo: add another cycle on page boundry cross
-            ADC(get_indirect_y(PC), 5);
-            PC += 2;
+            execute_instruction(&nes_cpu::ADC, &nes_cpu::get_indirect_y, 2, 5);
             break;
 
         case 0x29:
-            AND(get_immediate(PC + 1), 2);
-            PC += 2;
+            execute_instruction(&nes_cpu::AND, &nes_cpu::get_immediate, 2, 2);
             break;
         case 0x25:
-            AND(get_zeropage(PC + 1), 3);
-            PC += 2;
+            execute_instruction(&nes_cpu::AND, &nes_cpu::get_zeropage, 2, 3);
             break;
         case 0x35:
-            AND(get_zeropage_x(PC + 1), 4);
-            PC += 2;
+            execute_instruction(&nes_cpu::AND, &nes_cpu::get_zeropage_x, 2, 4);
             break;
         case 0x2D:
-            AND(get_absolute(PC + 1), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::AND, &nes_cpu::get_absolute, 3, 4);
             break;
         case 0x3D:
             // todo: add another cycle on page boundry cross
-            AND(get_absolute_x(PC + 1), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::AND, &nes_cpu::get_absolute_x, 3, 4);
             break;
         case 0x39:
             // todo: add another cycle on page boundry cross
-            AND(get_absolute_y(PC + 1), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::AND, &nes_cpu::get_absolute_y, 3, 4);
             break;
         case 0x21:
-            AND(get_indirect_x(PC + 1), 6);
-            PC += 2;
+            execute_instruction(&nes_cpu::AND, &nes_cpu::get_indirect_x, 2, 6);
             break;
         case 0x31:
             // todo: add another cycle on page boundry cross
-            AND(get_indirect_y(PC + 1), 5);
-            PC += 2;
+            execute_instruction(&nes_cpu::AND, &nes_cpu::get_indirect_y, 2, 5);
             break;
 
         case 0x0A:
-            ASL(-1, 2, true);
-            PC++;
+            execute_instruction_with_bool(&nes_cpu::ASL, 1, 2, true);
             break;
         case 0x06:
-            ASL(get_zeropage(PC + 1), 5, false);
-            PC += 2;
+            execute_instruction_with_bool_and_address(
+                &nes_cpu::ASL, &nes_cpu::get_zeropage, 2, 5, false);
             break;
         case 0x16:
-            ASL(get_zeropage_x(PC + 1), 6, false);
-            PC += 2;
+            execute_instruction_with_bool_and_address(
+                &nes_cpu::ASL, &nes_cpu::get_zeropage_x, 2, 6, false);
             break;
         case 0x0E:
-            ASL(get_absolute(PC + 1), 6, false);
-            PC += 3;
+            execute_instruction_with_bool_and_address(
+                &nes_cpu::ASL, &nes_cpu::get_absolute, 3, 6, false);
             break;
         case 0x1E:
-            ASL(get_absolute_x(PC + 1), 7, false);
-            PC += 3;
+            execute_instruction_with_bool_and_address(
+                &nes_cpu::ASL, &nes_cpu::get_absolute_x, 3, 7, false);
             break;
 
         case 0x90:
             // todo: add another cycle on page boundry cross
-            BCC(PC + 1, 2);
-            PC += 2;
+            execute_relative_instruction(&nes_cpu::BCC, 2, 2);
             break;
 
         case 0xB0:
             // todo: add another cycle on page boundry cross
-            BCS(PC + 1, 2);
-            PC += 2;
+            execute_relative_instruction(&nes_cpu::BCS, 2, 2);
             break;
 
         case 0xF0:
             // todo: add another cycles on page boundry cross
-            BEQ(PC + 1, 2);
-            PC += 2;
+            execute_relative_instruction(&nes_cpu::BEQ, 2, 2);
             break;
 
         case 0x24:
-            BIT(get_zeropage(PC + 1), 3);
-            PC += 2;
+            execute_instruction(&nes_cpu::BIT, &nes_cpu::get_zeropage, 2, 3);
             break;
         case 0x2C:
-            BIT(get_absolute(PC + 1), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::BIT, &nes_cpu::get_absolute, 3, 4);
             break;
 
         case 0x30:
             // todo: add another cycle on page boundry cross
-            BMI(PC + 1, 2);
-            PC += 2;
+            execute_relative_instruction(&nes_cpu::BMI, 2, 2);
             break;
 
         case 0xD0:
             // todo: add another cycle on page boundry cross
-            BNE(PC + 1, 2);
-            PC += 2;
+            execute_relative_instruction(&nes_cpu::BNE, 2, 2);
             break;
 
         case 0x10:
             // todo: add another cycle on page boundry cross
-            BPL(PC + 1, 2);
-            PC += 2;
+            execute_relative_instruction(&nes_cpu::BPL, 2, 2);
             break;
 
         case 0x00:
-            BRK(7);
-            PC++;
+            execute_implied_instruction(&nes_cpu::BRK, 7);
             break;
 
         case 0x50:
             // todo: add another cycle on page boundry cross
-            BVC(PC + 1, 2);
-            PC += 2;
+            execute_relative_instruction(&nes_cpu::BVC, 2, 2);
             break;
 
         case 0x70:
             // todo: add another cycle on page boundry cross
-            BVS(PC + 1, 2);
-            PC += 2;
+            execute_relative_instruction(&nes_cpu::BVS, 2, 2);
             break;
 
         case 0x18:
-            CLC(2);
-            PC++;
+            execute_implied_instruction(&nes_cpu::CLC, 2);
             break;
 
         case 0xD8:
-            CLD(2);
-            PC++;
+            execute_implied_instruction(&nes_cpu::CLD, 2);
             break;
 
         case 0x58:
-            CLI(2);
-            PC++;
+            execute_implied_instruction(&nes_cpu::CLI, 2);
             break;
 
         case 0xB8:
-            CLV(2);
-            PC++;
+            execute_implied_instruction(&nes_cpu::CLV, 2);
             break;
 
         case 0xC9:
-            CMP(get_immediate(PC + 1), 2);
-            PC += 2;
+            execute_instruction(&nes_cpu::CMP, &nes_cpu::get_immediate, 2, 2);
             break;
         case 0xC5:
-            CMP(get_zeropage(PC + 1), 3);
-            PC += 2;
+            execute_instruction(&nes_cpu::CMP, &nes_cpu::get_zeropage, 2, 3);
             break;
         case 0xD5:
-            CMP(get_zeropage_x(PC + 1), 4);
-            PC += 2;
+            execute_instruction(&nes_cpu::CMP, &nes_cpu::get_zeropage_x, 2, 4);
             break;
         case 0xCD:
-            CMP(get_absolute(PC + 1), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::CMP, &nes_cpu::get_absolute, 3, 4);
             break;
         case 0xDD:
             // todo: add another cycle on page boundry cross
-            CMP(get_absolute_x(PC + 1), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::CMP, &nes_cpu::get_absolute_x, 3, 4);
             break;
         case 0xD9:
             // todo: add another cycle on page boundry cross
-            CMP(get_absolute_y(PC + 1), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::CMP, &nes_cpu::get_absolute_y, 3, 4);
             break;
         case 0xC1:
-            CMP(get_indirect_x(PC + 1), 6);
-            PC += 2;
+            execute_instruction(&nes_cpu::CMP, &nes_cpu::get_indirect_x, 2, 6);
             break;
         case 0xD1:
             // todo: add another cycle on page boundry cross
-            CMP(get_indirect_y(PC + 1), 5);
-            PC += 2;
+            execute_instruction(&nes_cpu::CMP, &nes_cpu::get_indirect_y, 2, 5);
             break;
 
         case 0xE0:
-            CPX(get_immediate(PC + 1), 2);
-            PC += 2;
+            execute_instruction(&nes_cpu::CPX, &nes_cpu::get_immediate, 2, 2);
             break;
         case 0xE4:
-            CPX(get_zeropage(PC + 1), 3);
-            PC += 2;
+            execute_instruction(&nes_cpu::CPX, &nes_cpu::get_zeropage, 2, 3);
             break;
         case 0xEC:
-            CPX(get_absolute(PC + 1), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::CPX, &nes_cpu::get_absolute, 3, 4);
             break;
 
         case 0xC0:
-            CPY(get_immediate(PC + 1), 2);
-            PC += 2;
+            execute_instruction(&nes_cpu::CPY, &nes_cpu::get_immediate, 2, 2);
             break;
         case 0xC4:
-            CPY(get_zeropage(PC + 1), 3);
-            PC += 2;
+            execute_instruction(&nes_cpu::CPY, &nes_cpu::get_zeropage, 2, 3);
             break;
         case 0xCC:
-            CPY(get_absolute(PC + 1), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::CPY, &nes_cpu::get_absolute, 3, 4);
             break;
 
         case 0xC6:
-            DEC(get_zeropage(PC + 1), 5);
-            PC += 2;
+            execute_instruction(&nes_cpu::DEC, &nes_cpu::get_zeropage, 2, 5);
             break;
         case 0xD6:
-            DEC(get_zeropage_x(PC + 1), 6);
-            PC += 2;
+            execute_instruction(&nes_cpu::DEC, &nes_cpu::get_zeropage_x, 2, 6);
             break;
         case 0xCE:
-            DEC(get_absolute(PC + 1), 6);
-            PC += 3;
+            execute_instruction(&nes_cpu::DEC, &nes_cpu::get_absolute, 3, 6);
             break;
         case 0xDE:
-            DEC(get_absolute_x(PC + 1), 7);
-            PC += 3;
+            execute_instruction(&nes_cpu::DEC, &nes_cpu::get_absolute_x, 3, 7);
             break;
 
         case 0xCA:
-            DEX(2);
-            PC++;
+            execute_implied_instruction(&nes_cpu::DEX, 2);
             break;
 
         case 0x88:
-            DEY(2);
-            PC++;
+            execute_implied_instruction(&nes_cpu::DEY, 2);
             break;
 
         case 0x49:
-            EOR(get_immediate(PC + 1), 2);
-            PC += 2;
+            execute_instruction(&nes_cpu::EOR, &nes_cpu::get_immediate, 2, 2);
             break;
         case 0x45:
-            EOR(get_zeropage(PC + 1), 3);
-            PC += 2;
+            execute_instruction(&nes_cpu::EOR, &nes_cpu::get_zeropage, 2, 3);
             break;
         case 0x55:
-            EOR(get_zeropage_x(PC + 1), 4);
-            PC += 2;
+            execute_instruction(&nes_cpu::EOR, &nes_cpu::get_zeropage_x, 2, 4);
             break;
         case 0x4D:
-            EOR(get_absolute(PC + 1), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::EOR, &nes_cpu::get_absolute, 3, 4);
             break;
         case 0x5D:
             // todo: add another cycle on page boundry cross
-            EOR(get_absolute_x(PC + 1), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::EOR, &nes_cpu::get_absolute_x, 3, 4);
             break;
         case 0x59:
             // todo: add another cycle on page boundry cross
-            EOR(get_absolute_y(PC + 1), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::EOR, &nes_cpu::get_absolute_y, 3, 4);
             break;
         case 0x41:
-            EOR(get_indirect_x(PC + 1), 6);
-            PC += 2;
+            execute_instruction(&nes_cpu::EOR, &nes_cpu::get_indirect_x, 2, 6);
             break;
         case 0x51:
             // todo: add another cycle on page boundry cross
-            EOR(get_indirect_y(PC + 1), 5);
-            PC += 2;
+            execute_instruction(&nes_cpu::EOR, &nes_cpu::get_indirect_y, 2, 5);
             break;
 
         case 0xE6:
-            INC(get_zeropage(PC + 1), 5);
-            PC += 2;
+            execute_instruction(&nes_cpu::INC, &nes_cpu::get_zeropage, 2, 5);
             break;
         case 0xF6:
-            INC(get_zeropage_x(PC + 1), 6);
-            PC += 2;
+            execute_instruction(&nes_cpu::INC, &nes_cpu::get_zeropage_x, 2, 6);
             break;
         case 0xEE:
-            INC(get_absolute(PC + 1), 6);
-            PC += 3;
+            execute_instruction(&nes_cpu::INC, &nes_cpu::get_absolute, 3, 6);
             break;
         case 0xFE:
-            INC(get_absolute_x(PC + 1), 7);
-            PC += 3;
+            execute_instruction(&nes_cpu::INC, &nes_cpu::get_absolute_x, 3, 7);
             break;
 
         case 0xE8:
-            INX(2);
-            PC++;
+            execute_implied_instruction(&nes_cpu::INX, 2);
             break;
 
         case 0xC8:
-            INY(2);
-            PC++;
+            execute_implied_instruction(&nes_cpu::INY, 2);
             break;
 
         case 0x4C:
-            JMP(get_absolute(PC + 1), 3, false);
-            PC += 3;
+            execute_instruction_with_bool_and_address(
+                &nes_cpu::JMP, &nes_cpu::get_absolute, 3, 3, false);
             break;
         case 0x6C:
-            JMP(get_absolute(PC + 1), 5, true);
-            PC += 3;
+            execute_instruction_with_bool_and_address(
+                &nes_cpu::JMP, &nes_cpu::get_absolute, 3, 5, true);
             break;
 
         case 0x20:
-            JSR(get_absolute(PC + 1), 6);
-            PC += 3;
+            execute_instruction(&nes_cpu::JSR, &nes_cpu::get_absolute, 3, 6);
             break;
 
         case 0xA9:
-            LDA(get_immediate(PC + 1), 2);
-            PC += 2;
+            execute_instruction(&nes_cpu::LDA, &nes_cpu::get_immediate, 2, 2);
             break;
         case 0xA5:
-            LDA(get_zeropage(PC + 1), 3);
-            PC += 2;
+            execute_instruction(&nes_cpu::LDA, &nes_cpu::get_zeropage, 2, 3);
             break;
         case 0xB5:
-            LDA(get_zeropage_x(PC + 1), 4);
-            PC += 2;
+            execute_instruction(&nes_cpu::LDA, &nes_cpu::get_zeropage_x, 2, 4);
             break;
         case 0xAD:
-            LDA(get_absolute(PC + 1), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::LDA, &nes_cpu::get_absolute, 3, 4);
             break;
         case 0xBD:
             // todo: add another cycle on page boundry cross
-            LDA(get_absolute_x(PC + 1), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::LDA, &nes_cpu::get_absolute_x, 3, 4);
             break;
         case 0xB9:
             // todo: add another cycle on page boundry cross
-            LDA(get_absolute_y(PC + 1), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::LDA, &nes_cpu::get_absolute_y, 3, 4);
             break;
         case 0xA1:
-            LDA(get_indirect_x(PC + 1), 6);
-            PC += 2;
+            execute_instruction(&nes_cpu::LDA, &nes_cpu::get_indirect_x, 2, 6);
             break;
         case 0xB1:
             // todo: add another cycle on page boundry cross
-            LDA(get_indirect_y(PC + 1), 5);
-            PC += 2;
+            execute_instruction(&nes_cpu::LDA, &nes_cpu::get_indirect_y, 2, 5);
             break;
 
         case 0xA2:
-            LDX(get_immediate(PC + 1), 2);
-            PC += 2;
+            execute_instruction(&nes_cpu::LDX, &nes_cpu::get_immediate, 2, 2);
             break;
         case 0xA6:
-            LDX(get_zeropage(PC + 1), 3);
-            PC += 2;
+            execute_instruction(&nes_cpu::LDX, &nes_cpu::get_zeropage, 2, 3);
             break;
         case 0xB6:
-            LDX(get_zeropage_y(PC + 1), 4);
-            PC += 2;
+            execute_instruction(&nes_cpu::LDX, &nes_cpu::get_zeropage_y, 2, 4);
             break;
         case 0xAE:
-            LDX(get_absolute(PC + 1), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::LDX, &nes_cpu::get_absolute, 3, 4);
             break;
         case 0xBE:
             // todo: add another cycle on page boundry cross
-            LDX(get_absolute_y(PC + 1), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::LDX, &nes_cpu::get_absolute_y, 3, 4);
             break;
 
         case 0xA0:
-            LDY(get_immediate(PC + 1), 2);
-            PC += 2;
+            execute_instruction(&nes_cpu::LDY, &nes_cpu::get_immediate, 2, 2);
             break;
         case 0xA4:
-            LDY(get_zeropage(PC + 1), 3);
-            PC += 2;
+            execute_instruction(&nes_cpu::LDY, &nes_cpu::get_zeropage, 2, 3);
             break;
         case 0xB4:
-            LDY(get_zeropage_x(PC + 1), 4);
-            PC += 2;
+            execute_instruction(&nes_cpu::LDY, &nes_cpu::get_zeropage_x, 2, 4);
             break;
         case 0xAC:
-            LDY(get_absolute(PC + 1), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::LDY, &nes_cpu::get_absolute, 3, 4);
             break;
         case 0xBC:
             // todo: add another cycle on page boundry cross
-            LDY(get_absolute_x(PC + 1), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::LDY, &nes_cpu::get_absolute_x, 3, 4);
             break;
 
         case 0x4A:
-            LSR(-1, 2, true);
-            PC++;
+            execute_instruction_with_bool(&nes_cpu::LSR, 1, 2, true);
             break;
         case 0x46:
-            LSR(get_zeropage(PC + 1), 5, false);
-            PC += 2;
+            execute_instruction_with_bool_and_address(
+                &nes_cpu::LSR, &nes_cpu::get_zeropage, 2, 5, false);
             break;
         case 0x56:
-            LSR(get_zeropage_x(PC + 1), 6, false);
-            PC += 2;
+            execute_instruction_with_bool_and_address(
+                &nes_cpu::LSR, &nes_cpu::get_zeropage_x, 2, 6, false);
             break;
         case 0x4E:
-            LSR(get_absolute(PC + 1), 6, false);
-            PC += 3;
+            execute_instruction_with_bool_and_address(
+                &nes_cpu::LSR, &nes_cpu::get_absolute, 3, 6, false);
             break;
         case 0x5E:
-            LSR(get_absolute_x(PC), 7, false);
-            PC += 3;
+            execute_instruction_with_bool_and_address(
+                &nes_cpu::LSR, &nes_cpu::get_absolute_x, 3, 7, false);
             break;
 
         case 0xEA:
-            NOP(2);
-            PC++;
+            execute_implied_instruction(&nes_cpu::NOP, 2);
             break;
 
         case 0x09:
-            ORA(get_immediate(PC + 1), 2);
-            PC += 2;
+            execute_instruction(&nes_cpu::ORA, &nes_cpu::get_immediate, 2, 2);
             break;
         case 0x05:
-            ORA(get_zeropage(PC + 1), 3);
-            PC += 2;
+            execute_instruction(&nes_cpu::ORA, &nes_cpu::get_zeropage, 2, 3);
             break;
         case 0x15:
-            ORA(get_zeropage_x(PC), 4);
-            PC += 2;
+            execute_instruction(&nes_cpu::ORA, &nes_cpu::get_zeropage_x, 2, 4);
             break;
         case 0x0D:
-            ORA(get_absolute(PC + 1), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::ORA, &nes_cpu::get_absolute, 3, 4);
             break;
         case 0x1D:
             // todo: add another cycle on page boundry cross
-            ORA(get_absolute_x(PC), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::ORA, &nes_cpu::get_absolute_x, 3, 4);
             break;
         case 0x19:
             // todo: add another cycle on page boundry cross
-            ORA(get_absolute_y(PC), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::ORA, &nes_cpu::get_absolute_y, 3, 4);
             break;
         case 0x01:
-            ORA(get_indirect_x(PC + 1), 6);
-            PC += 2;
+            execute_instruction(&nes_cpu::ORA, &nes_cpu::get_indirect_x, 2, 6);
             break;
         case 0x11:
             // todo: add another cycle on page boundry cross
-            ORA(get_indirect_y(PC + 1), 5);
-            PC += 2;
-
             // detect_and_process_page_cross(PC + 1, get_indirect_y(PC + 1));
+            execute_instruction(&nes_cpu::ORA, &nes_cpu::get_indirect_y, 2, 5);
             break;
 
         case 0x48:
-            PHA(3);
-            PC++;
+            execute_implied_instruction(&nes_cpu::PHA, 3);
             break;
 
         case 0x08:
-            PHP(3);
-            PC++;
+            execute_implied_instruction(&nes_cpu::PHP, 3);
             break;
 
         case 0x68:
-            PLA(4);
-            PC++;
+            execute_implied_instruction(&nes_cpu::PLA, 4);
             break;
 
         case 0x28:
-            PLP(4);
-            PC++;
+            execute_implied_instruction(&nes_cpu::PLP, 4);
             break;
 
         case 0x2A:
-            ROL(-1, 2, true);
-            PC++;
+            execute_instruction_with_bool(&nes_cpu::ROL, 1, 2, true);
             break;
         case 0x26:
-            ROL(get_zeropage(PC), 5, false);
-            PC += 2;
+            execute_instruction_with_bool_and_address(
+                &nes_cpu::ROL, &nes_cpu::get_zeropage, 2, 5, false);
             break;
         case 0x36:
-            ROL(get_zeropage_x(PC), 6, false);
-            PC += 2;
+            execute_instruction_with_bool_and_address(
+                &nes_cpu::ROL, &nes_cpu::get_zeropage_x, 2, 6, false);
             break;
         case 0x2E:
-            ROL(get_absolute(PC), 6, false);
-            PC += 3;
+            execute_instruction_with_bool_and_address(
+                &nes_cpu::ROL, &nes_cpu::get_absolute, 3, 6, false);
             break;
         case 0x3E:
-            ROL(get_absolute_x(PC), 7, false);
-            PC += 3;
+            execute_instruction_with_bool_and_address(
+                &nes_cpu::ROL, &nes_cpu::get_absolute_x, 3, 7, false);
             break;
 
         case 0x6A:
-            ROR(-1, 2, true);
-            PC++;
+            execute_instruction_with_bool(&nes_cpu::ROR, 1, 2, true);
             break;
         case 0x66:
-            ROR(get_zeropage(PC), 5, false);
-            PC += 2;
+            execute_instruction_with_bool_and_address(
+                &nes_cpu::ROR, &nes_cpu::get_zeropage, 2, 5, false);
             break;
         case 0x76:
-            ROR(get_zeropage_x(PC), 6, false);
-            PC += 2;
+            execute_instruction_with_bool_and_address(
+                &nes_cpu::ROR, &nes_cpu::get_zeropage_x, 2, 6, false);
             break;
         case 0x6E:
-            ROR(get_absolute(PC), 6, false);
-            PC += 3;
+            execute_instruction_with_bool_and_address(
+                &nes_cpu::ROR, &nes_cpu::get_absolute, 3, 6, false);
             break;
         case 0x7E:
-            ROR(get_absolute_x(PC), 7, false);
-            PC += 3;
+            execute_instruction_with_bool_and_address(
+                &nes_cpu::ROR, &nes_cpu::get_absolute_x, 3, 7, false);
             break;
 
         case 0x40:
-            RTI(6);
-            PC++;
+            execute_implied_instruction(&nes_cpu::RTI, 6);
             break;
 
         case 0x60:
-            RTS(6);
-            PC++;
+            execute_implied_instruction(&nes_cpu::RTS, 6);
             break;
 
         case 0xE9:
-            SBC(get_immediate(PC), 2);
-            PC += 2;
+            execute_instruction(&nes_cpu::SBC, &nes_cpu::get_immediate, 2, 2);
             break;
         case 0xE5:
-            SBC(get_zeropage(PC), 3);
-            PC += 2;
+            execute_instruction(&nes_cpu::SBC, &nes_cpu::get_zeropage, 2, 3);
             break;
         case 0xF5:
-            SBC(get_zeropage_x(PC), 4);
-            PC += 2;
+            execute_instruction(&nes_cpu::SBC, &nes_cpu::get_zeropage_x, 2, 4);
             break;
         case 0xED:
-            SBC(get_absolute(PC), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::SBC, &nes_cpu::get_absolute, 3, 4);
             break;
         case 0xFD:
             // todo: add another cycles on page boundry cross
-            SBC(get_absolute_x(PC), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::SBC, &nes_cpu::get_absolute_x, 3, 4);
             break;
         case 0xF9:
             // todo: add another cycles on page boundry cross
-            SBC(get_absolute_y(PC), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::SBC, &nes_cpu::get_absolute_y, 3, 4);
             break;
         case 0xE1:
-            SBC(get_indirect_x(PC), 6);
-            PC += 2;
+            execute_instruction(&nes_cpu::SBC, &nes_cpu::get_indirect_x, 2, 6);
             break;
         case 0xF1:
             // todo: add another cycles on page boundry cross
-            SBC(get_indirect_y(PC), 5);
-            PC += 2;
+            execute_instruction(&nes_cpu::SBC, &nes_cpu::get_indirect_y, 2, 5);
             break;
 
         case 0x38:
-            SEC(2);
-            PC++;
+            execute_implied_instruction(&nes_cpu::SEC, 2);
             break;
 
         case 0xF8:
-            SED(2);
-            PC++;
+            execute_implied_instruction(&nes_cpu::SED, 2);
             break;
 
         case 0x78:
-            SEI(2);
-            PC++;
+            execute_implied_instruction(&nes_cpu::SEI, 2);
             break;
 
         case 0x85:
-            STA(get_zeropage(PC), 3);
-            PC += 2;
+            execute_instruction(&nes_cpu::STA, &nes_cpu::get_zeropage, 2, 3);
             break;
         case 0x95:
-            STA(get_zeropage_x(PC), 4);
-            PC += 2;
+            execute_instruction(&nes_cpu::STA, &nes_cpu::get_zeropage_x, 2, 4);
             break;
         case 0x8D:
-            STA(get_absolute(PC), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::STA, &nes_cpu::get_absolute, 3, 4);
             break;
         case 0x9D:
-            STA(get_absolute_x(PC), 5);
-            PC += 3;
+            execute_instruction(&nes_cpu::STA, &nes_cpu::get_absolute_x, 3, 5);
             break;
         case 0x99:
-            STA(get_absolute_y(PC), 5);
-            PC += 3;
+            execute_instruction(&nes_cpu::STA, &nes_cpu::get_absolute_y, 3, 5);
             break;
         case 0x81:
-            STA(get_indirect_x(PC), 6);
-            PC += 2
+            execute_instruction(&nes_cpu::STA, &nes_cpu::get_indirect_x, 2, 6);
             break;
         case 0x91:
-            STA(get_indirect_y(PC), 6);
-            PC += 2;
+            execute_instruction(&nes_cpu::STA, &nes_cpu::get_indirect_y, 2, 6);
             break;
 
         case 0x86:
-            STX(get_zeropage(PC), 3);
-            PC += 2;
+            execute_instruction(&nes_cpu::STX, &nes_cpu::get_zeropage, 2, 3);
             break;
         case 0x96:
-            STX(get_zeropage_x(PC), 4);
-            PC += 2;
+            execute_instruction(&nes_cpu::STX, &nes_cpu::get_zeropage_x, 2, 4);
             break;
         case 0x8E:
-            STX(get_absolute(PC), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::STX, &nes_cpu::get_absolute, 3, 4);
             break;
 
         case 0x84:
-            STY(get_zeropage(PC), 3);
-            PC += 2;
+            execute_instruction(&nes_cpu::STY, &nes_cpu::get_zeropage, 2, 3);
             break;
         case 0x94:
-            STY(get_zeropage_x(PC), 4);
-            PC += 2;
+            execute_instruction(&nes_cpu::STY, &nes_cpu::get_zeropage_x, 2, 4);
             break;
         case 0x8C:
-            STY(get_absolute(PC), 4);
-            PC += 3;
+            execute_instruction(&nes_cpu::STY, &nes_cpu::get_absolute, 3, 4);
             break;
 
         case 0xAA:
-            TAX(2);
-            PC++;
+            execute_implied_instruction(&nes_cpu::TAX, 2);
             break;
 
         case 0xA8:
-            TAY(2);
-            PC++;
+            execute_implied_instruction(&nes_cpu::TAY, 2);
             break;
 
         case 0xBA:
-            TSX(2);
-            PC++;
+            execute_implied_instruction(&nes_cpu::TSX, 2);
             break;
 
         case 0x8A:
-            TXA(2);
-            PC++;
+            execute_implied_instruction(&nes_cpu::TXA, 2);
             break;
 
         case 0x9A:
-            TXS(2);
-            PC++;
+            execute_implied_instruction(&nes_cpu::TXS, 2);
             break;
 
         case 0x98:
-            TYA(2);
-            PC++;
+            execute_implied_instruction(&nes_cpu::TYA, 2);
             break;
         
         default:

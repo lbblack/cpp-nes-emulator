@@ -7,9 +7,11 @@ int main(void)
 
     // cpu.print_test_rom();
 
-    cout << cpu.step() << endl;
-    cout << cpu.step() << endl;
-    cpu.print_registers();
+    // cout << cpu.step() << endl;
+    // cout << cpu.step() << endl;
+    // cpu.print_registers();
+
+    cpu.step();
 
     return 0;
 }
