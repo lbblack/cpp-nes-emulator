@@ -1363,7 +1363,7 @@ bool nes_cpu::step()
             execute_instruction(&nes_cpu::STX, &nes_cpu::get_zeropage, 2, 3);
             break;
         case 0x96:
-            execute_instruction(&nes_cpu::STX, &nes_cpu::get_zeropage_x, 2, 4);
+            execute_instruction(&nes_cpu::STX, &nes_cpu::get_zeropage_y, 2, 4);
             break;
         case 0x8E:
             execute_instruction(&nes_cpu::STX, &nes_cpu::get_absolute, 3, 4);
