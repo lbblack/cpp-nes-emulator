@@ -103,7 +103,7 @@ public:
     void INX(uint8_t cycle_count);
     void INY(uint8_t cycle_count);
 
-    void JMP(uint16_t addr, uint8_t cycle_count);
+    void JMP(uint16_t addr, uint8_t cycle_count, bool is_indirect);
     void JSR(uint16_t addr, uint8_t cycle_count);
 
     void LDA(uint16_t addr, uint8_t cycle_count);
@@ -140,6 +140,32 @@ public:
     void TXS(uint8_t cycle_count);
     void TYA(uint8_t cycle_count);
 
+    void execute_implied_instruction(
+        void (*opcode_function)(uint8_t),
+        uint8_t cycle_count
+    );
+
+    void execute_instruction_with_bool(
+        void(*opcode_function)(uint16_t, uint8_t, bool),
+        uint8_t instruction_length,
+        uint8_t cycle_count,
+        bool parameter_flag
+    );
+
+    void execute_instruction_with_bool_and_address(
+        void(*opcode_function)(uint16_t, uint8_t, bool),
+        void(*addressing_function)(uint16_t),
+        uint8_t instruction_length,
+        uint8_t cycle_count,
+        bool parameter_flag
+    );
+
+    void execute_instruction(
+        void(*opcode_function)(uint16_t, uint8_t, bool),
+        void(*addressing_function)(uint16_t),
+        uint8_t instruction_length,
+        uint8_t cycle_count
+    );
     // step through loaded CPU instructions
     bool step();    
 };
