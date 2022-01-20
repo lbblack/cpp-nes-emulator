@@ -44,8 +44,18 @@ bool nes_cpu::LOAD_TEST_ROM(string input_filename)
 void nes_cpu::print_test_rom()
 {
     for (int i = 0x4020; i < 0x4100; i++) {
-        cout << setfill('0') << setw(2) << hex << (0xff & (unsigned int)MEM[i]) << endl;
+        cout << setfill('0') << setw(2) << hex << (0xFF & (unsigned int)MEM[i]) << endl;
     }
+}
+
+void nes_cpu::print_registers()
+{
+    cout << setfill('0') << setw(2) << "A: " << hex << (0xFF & A);
+    cout << setfill('0') << setw(2) << " X: " << hex << (0xFF & X);
+    cout << setfill('0') << setw(2) << " Y: " << hex << (0xFF & Y);
+    cout << setfill('0') << setw(2) << " P: " << hex << (0xFF & P);
+    cout << setfill('0') << setw(2) << " SP: " << hex << (0xFF & SP);
+    cout << setfill('0') << setw(2) << " PC: " << hex << (0xFFFF & PC) << endl;
 }
 
 void nes_cpu::write_mem_to_address(uint8_t value, uint16_t addr)
@@ -89,6 +99,16 @@ uint16_t nes_cpu::get_zeropage_x(uint16_t addr)
 uint16_t nes_cpu::get_zeropage_y(uint16_t addr)
 {
     return (addr + Y) & 0xFF;
+}
+
+uint16_t nes_cpu::get_indirect(uint16_t addr)
+{
+    uint16_t value = (uint16_t) read_mem_from_address(addr);
+    uint16_t low_nibble = value;
+    value = (uint16_t) read_mem_from_address(addr - 1);
+    uint16_t high_nibble = value;
+
+    return (low_nibble << 8) & high_nibble;
 }
 
 uint16_t nes_cpu::get_indirect_x(uint16_t addr)
@@ -445,12 +465,7 @@ void nes_cpu::JMP(uint16_t addr, uint8_t cycle_count)
 {
     cycles += cycle_count;
 
-    uint16_t value = (uint16_t) read_mem_from_address(addr);
-    uint16_t low_nibble = value;
-    value = (uint16_t) read_mem_from_address(addr - 1);
-    uint16_t high_nibble = value;
-
-    PC = (low_nibble << 8) & high_nibble;
+    PC = addr;
 }
 
 // todo : JPM must NEVER use a vector beginning on the last byte of a page.
@@ -653,7 +668,7 @@ void nes_cpu::ROR(uint16_t addr, uint8_t cycle_count, bool accumulator)
     P |= carry;
 }
 
-void nes_cpu::RTI(uint16_t addr, uint8_t cycle_count)
+void nes_cpu::RTI(uint8_t cycle_count)
 {
     cycles += cycle_count;
 
@@ -666,7 +681,7 @@ void nes_cpu::RTI(uint16_t addr, uint8_t cycle_count)
     PC = (low_nibble << 8) & high_nibble;
 }
 
-void nes_cpu::RTS(uint16_t addr, uint8_t cycle_count)
+void nes_cpu::RTS(uint8_t cycle_count)
 {
     cycles += cycle_count;
 
@@ -768,6 +783,513 @@ void nes_cpu::TYA(uint8_t cycle_count)
 
 bool nes_cpu::step()
 {
+    switch(read_mem_from_address(++PC)) {
+        case 0x00:
+            BRK(7);
+            break;
+        case 0x01:
+            ORA(get_indirect_x(PC), 6);
+            break;
+        case 0x05:
+            ORA(get_zeropage(PC), 3);
+            break;
+        case 0x06:
+            ASL(get_zeropage(PC), 5, false);
+            break;
+        case 0x08:
+            PHP(3);
+            break;
+        case 0x09:
+            ORA(get_immediate(PC), 2);
+            break;
+        case 0x0A:
+            ASL(-1, 2, true);
+            break;
+        case 0x0D:
+            ORA(get_absolute(PC), 4);
+            PC++;
+            break;
+        case 0x0E:
+            ASL(get_absolute(PC), 6, false);
+            PC++;
+            break;
+        case 0x10:
+            BPL(PC, 2); // todo: add another cycle on page boundry cross
+            PC++;
+            break;
+        case 0x11:
+            ORA(get_indirect_y(PC), 5); // todo: add another cycle on page boundry cross
+            break;
+        case 0x15:
+            ORA(get_zeropage_x(PC), 4);
+            break;
+        case 0x16:
+            ORA(get_zeropage_x(PC), 6);
+            break;
+        case 0x18:
+            CLC(2);
+            break;
+        case 0x19:
+            ORA(get_absolute_y(PC), 4); // todo: add another cycle on page boundry cross
+            PC++;
+            break;
+        case 0x1D:
+            ORA(get_absolute_x(PC), 4); // todo: add another cycle on page boundry cross
+            PC++;
+            break;
+        case 0x1E:
+            ASL(get_absolute_x(PC), 7, false);
+            PC++;
+            break;
+        case 0x20:
+            JSR(get_absolute(PC), 6);
+            PC++;
+            break;
+        case 0x21:
+            AND(get_indirect_x(PC), 6);
+            break;
+        case 0x24:
+            BIT(get_zeropage(PC), 3);
+            break;
+        case 0x25:
+            AND(get_zeropage(PC), 3);
+            break;
+        case 0x26:
+            ROL(get_zeropage(PC), 5, false);
+            break;
+        case 0x28:
+            PLP(4);
+            break;
+        case 0x29:
+            AND(get_immediate(PC), 2);
+            break;
+        case 0x2A:
+            ROL(-1, 2, true);
+            break;
+        case 0x2C:
+            BIT(get_zeropage(PC), 4);
+            PC++;
+            break;
+        case 0x2D:
+            AND(get_absolute(PC), 4);
+            PC++;
+            break;
+        case 0x2E:
+            ROL(get_absolute(PC), 6, false);
+            PC++;
+            break;
+        case 0x30:
+            BMI(PC, 2); // todo: add another cycle on page boundry cross
+            PC++;
+            break;
+        case 0x31:
+            AND(get_indirect_y(PC), 5); // todo: add another cycle on page boundry cross
+            break;
+        case 0x35:
+            AND(get_zeropage_x(PC), 4);
+            break;
+        case 0x36:
+            ROL(get_zeropage_x(PC), 6, false);
+            break;
+        case 0x38:
+            SEC(2);
+            break;
+        case 0x39:
+            AND(get_absolute_y(PC), 4); // todo: add another cycle on page boundry cross
+            PC++;
+            break;
+        case 0x3D:
+            AND(get_absolute_x(PC), 4); // todo: add another cycle on page boundry cross
+            PC++;
+            break;
+        case 0x3E:
+            ROL(get_absolute_x(PC), 7, false);
+            PC++;
+            break;
+        case 0x40:
+            RTI(6);
+            break;
+        case 0x41:
+            EOR(get_indirect_x(PC), 6);
+            break;
+        case 0x45:
+            EOR(get_zeropage(PC), 3);
+            break;
+        case 0x46:
+            LSR(get_zeropage(PC), 5, false);
+            break;
+        case 0x48:
+            PHA(3);
+            break;
+        case 0x49:
+            EOR(get_immediate(PC), 2);
+            break;
+        case 0x4A:
+            LSR(-1, 2, true);
+            break;
+        case 0x4C:
+            JMP(get_absolute(PC), 3);
+            PC++;
+            break;
+        case 0x4D:
+            EOR(get_absolute(PC), 4);
+            PC++;
+            break;
+        case 0x4E:
+            LSR(get_absolute(PC), 6, false);
+            PC++;
+            break;
+        case 0x50:
+            BVC(PC, 2); // todo: add another cycle on page boundry cross
+            break;
+        case 0x51:
+            EOR(get_indirect_y(PC), 5); // todo: add another cycle on page boundry cross
+            break;
+        case 0x55:
+            EOR(get_zeropage_x(PC), 2);
+            break;
+        case 0x56:
+            LSR(get_zeropage_x(PC), 6, false);
+            break;
+        case 0x58:
+            CLI(2);
+            break;
+        case 0x59:
+            EOR(get_absolute_y(PC), 4); // todo: add another cycle on page boundry cross
+            break;
+        case 0x5D:
+            EOR(get_absolute_x(PC), 4); // todo: add another cycle on page boundry cross
+            PC++;
+            break;
+        case 0x5E:
+            LSR(get_absolute_x(PC), 7, false);
+            PC++;
+            break;
+        case 0x60:
+            RTS(6);
+            break;
+        case 0x61:
+            ADC(get_indirect_x(PC), 6);
+            break;
+        case 0x65:
+            ADC(get_zeropage(PC), 3);
+            break;
+        case 0x66:
+            ROR(get_zeropage(PC), 5, false);
+            break;
+        case 0x68:
+            PLA(4);
+            break;
+        case 0x69:
+            ADC(get_immediate(PC), 2);
+            break;
+        case 0x6A:
+            ROR(-1, 2, true);
+            break;
+        case 0x6C:
+            JMP(get_indirect(PC), 5);
+            PC++;
+            break;
+        case 0x6D:
+            ADC(get_absolute(PC), 4);
+            PC++;
+            break;
+        case 0x6E:
+            ROR(get_absolute(PC), 6, false);
+            PC++;
+            break;
+        case 0x70:
+            BVS(PC, 2); // todo: add another cycle on page boundry cross
+            PC++;
+            break;
+        case 0x71:
+            ADC(get_indirect_y(PC), 5); // todo: add another cycle on page boundry cross
+            break;
+        case 0x75:
+            ADC(get_zeropage_x(PC), 4);
+            break;
+        case 0x76:
+            ROR(get_zeropage_x(PC), 6, false);
+            break;
+        case 0x78:
+            SEI(2);
+            break;
+        case 0x79:
+            ADC(get_absolute_y(PC), 4); // todo: add another cycle on page boundry cross
+            PC++;
+            break;
+        case 0x7D:
+            ADC(get_absolute_x(PC), 4); // todo: add another cycle on page boundry cross
+            PC++;
+            break;
+        case 0x7E:
+            ROR(get_absolute_x(PC), 7, false);
+            PC++;
+            break;
+        case 0x81:
+            STA(get_indirect_x(PC), 6);
+            break;
+        case 0x84:
+            STY(get_zeropage(PC), 3);
+            break;
+        case 0x85:
+            STA(get_zeropage(PC), 3);
+            break;
+        case 0x86:
+            STX(get_zeropage(PC), 3);
+            break;
+        case 0x88:
+            DEY(2);
+            break;
+        case 0x8A:
+            TXA(2);
+            break;
+        case 0x8C:
+            STY(get_absolute(PC), 4);
+            PC++;
+            break;
+        case 0x8D:
+            STA(get_absolute(PC), 4);
+            PC++;
+            break;
+        case 0x8E:
+            STX(get_absolute(PC), 4);
+            PC++;
+            break;
+        case 0x90:
+            BCC(PC, 2); // todo: add another cycle on page boundry cross
+            PC++;
+            break;
+        case 0x91:
+            STA(get_indirect_y(PC), 6);
+            break;
+        case 0x94:
+            STY(get_zeropage_x(PC), 4);
+            break;
+        case 0x95:
+            STA(get_zeropage_x(PC), 4);
+            break;
+        case 0x96:
+            STX(get_zeropage_x(PC), 4);
+            break;
+        case 0x98:
+            TYA(2);
+            break;
+        case 0x99:
+            STA(get_absolute_y(PC), 5);
+            PC++;
+            break;
+        case 0x9A:
+            TXS(2);
+            break;
+        case 0x9D:
+            STA(get_absolute_x(PC), 5);
+            PC++;
+            break;
+        case 0xA0:
+            LDY(get_immediate(PC), 2);
+            break;
+        case 0xA1:
+            LDA(get_indirect_x(PC), 6);
+            break;
+        case 0xA2:
+            LDX(get_immediate(PC), 2);
+            break;
+        case 0xA4:
+            LDY(get_zeropage(PC), 3);
+            break;
+        case 0xA5:
+            LDA(get_zeropage(PC), 3);
+            break;
+        case 0xA6:
+            LDX(get_zeropage(PC), 2);
+            break;
+        case 0xA8:
+            TAY(2);
+            break;
+        case 0xA9:
+            LDA(get_immediate(PC), 2);
+            break;
+        case 0xAA:
+            TAX(2);
+            break;
+        case 0xAC:
+            LDY(get_absolute(PC), 4);
+            PC++;
+            break;
+        case 0xAD:
+            LDA(get_absolute(PC), 4);
+            PC++;
+            break;
+        case 0xAE:
+            LDX(get_absolute(PC), 4);
+            PC++;
+            break;
+        case 0xB0:
+            BCS(PC, 2); // todo: add another cycle on page boundry cross
+            PC++;
+            break;
+        case 0xB1:
+            LDA(get_indirect_y(PC), 5); // todo: add another cycle on page boundry cross
+            break;
+        case 0xB4:
+            LDY(get_zeropage_x(PC), 4);
+            break;
+        case 0xB5:
+            LDA(get_zeropage_x(PC), 4);
+            break;
+        case 0xB6:
+            LDY(get_zeropage_x(PC), 4);
+            break;
+        case 0xB8:
+            CLV(2);
+            break;
+        case 0xB9:
+            LDA(get_absolute_y(PC), 4); // todo: add another cycle on page boundry cross
+            PC++;
+            break;
+        case 0xBA:
+            TSX(2);
+            break;
+        case 0xBC:
+            LDY(get_absolute_x(PC), 4); // todo: add another cycle on page boundry cross
+            PC++;
+            break;
+        case 0xBD:
+            LDA(get_absolute_x(PC), 4); // todo: add another cycle on page boundry cross
+            PC++;
+            break;
+        case 0xBE:
+            LDX(get_absolute_y(PC), 4); // todo: add another cycle on page boundry cross
+            PC++;
+            break;
+        case 0xC0:
+            CPY(get_immediate(PC), 2);
+            break;
+        case 0xC1:
+            CMP(get_indirect_x(PC), 6);
+            break;
+        case 0xC4:
+            CPY(get_zeropage(PC), 3);
+            break;
+        case 0xC5:
+            CMP(get_zeropage(PC), 3);
+            break;
+        case 0xC6:
+            DEC(get_zeropage(PC), 5);
+            break;
+        case 0xC8:
+            INY(2);
+            break;
+        case 0xC9:
+            CMP(get_immediate(PC), 2);
+            break;
+        case 0xCA:
+            DEX(2);
+            break;
+        case 0xCC:
+            CPY(get_absolute(PC), 4);
+            PC++;
+            break;
+        case 0xCD:
+            CMP(get_absolute(PC), 4);
+            PC++;
+            break;
+        case 0xCE:
+            DEC(get_absolute(PC), 6);
+            PC++;
+            break;
+        case 0xD0:
+            BNE(PC, 2); // todo: add another cycle on page boundry cross
+            PC++;
+            break;
+        case 0xD1:
+            CMP(get_indirect_y(PC), 5); // todo: add another cycle on page boundry cross
+            break;
+        case 0xD5:
+            CMP(get_zeropage_x(PC), 4);
+            break;
+        case 0xD6:
+            DEC(get_zeropage_x(PC), 6);
+            break;
+        case 0xD8:
+            CLD(2);
+            break;
+        case 0xD9:
+            CMP(get_absolute_y(PC), 4); // todo: add another cycle on page boundry cross
+            PC++;
+            break;
+        case 0xDD:
+            CMP(get_absolute_x(PC), 4); // todo: add another cycle on page boundry cross
+            PC++;
+            break;
+        case 0xDE:
+            DEC(get_absolute_x(PC), 7);
+            PC++;
+            break;
+        case 0xE0:
+            CPX(get_immediate(PC), 2);
+            break;
+        case 0xE1:
+            SBC(get_indirect_x(PC), 6);
+            break;
+        case 0xE4:
+            CPX(get_zeropage(PC), 3);
+            break;
+        case 0xE5:
+            SBC(get_zeropage(PC), 3);
+            break;
+        case 0xE6:
+            INC(get_zeropage(PC), 5);
+            break;
+        case 0xE8:
+            INX(2);
+            break;
+        case 0xE9:
+            SBC(get_immediate(PC), 2);
+            break;
+        case 0xEA:
+            NOP(2);
+            break;
+        case 0xEC:
+            CPX(get_absolute(PC), 4);
+            break;
+        case 0xED:
+            SBC(get_absolute(PC), 4);
+            break;
+        case 0xEE:
+            INC(get_absolute(PC), 6);
+            break;
+        case 0xF0:
+            BEQ(PC, 2); // todo: add another cycles on page boundry cross
+            break;
+        case 0xF1:
+            SBC(get_indirect_y(PC), 5); // todo: add another cycles on page boundry cross
+            break;
+        case 0xF5:
+            SBC(get_zeropage_x(PC), 4);
+            break;
+        case 0xF6:
+            INC(get_zeropage_x(PC), 6);
+            break;
+        case 0xF8:
+            SED(2);
+            break;
+        case 0xF9:
+            SBC(get_absolute_y(PC), 4); // todo: add another cycles on page boundry cross
+            PC++;
+            break;
+        case 0xFD:
+            SBC(get_absolute_x(PC), 4); // todo: add another cycles on page boundry cross
+            PC++;
+            break;
+        case 0xFE:
+            INC(get_absolute_x(PC), 7);
+            break;
+        default:
+            return false;
+    }
+
     return true;
 }
 

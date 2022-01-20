@@ -37,6 +37,7 @@ public:
 
     bool LOAD_TEST_ROM(string input_filename);
     void print_test_rom();
+    void print_registers();
 
     uint8_t read_mem_from_address(uint16_t addr);
     void write_mem_to_address(uint8_t value, uint16_t destination);
@@ -52,6 +53,7 @@ public:
     uint16_t get_zeropage_x(uint16_t addr);
     // zeropage, y-indexed - same as zeropage, but offset with register Y
     uint16_t get_zeropage_y(uint16_t addr);
+    uint16_t get_indirect(uint16_t addr);
     // indirect, x-indexed - read the value of the immediate byte.
     // use this value + X (low nibble), and this value + X + 1 (high nibble) as an address
     uint16_t get_indirect_x(uint16_t addr);
@@ -120,8 +122,8 @@ public:
 
     void ROL(uint16_t addr, uint8_t cycle_count, bool accumulator);
     void ROR(uint16_t addr, uint8_t cycle_count, bool accumulator);
-    void RTI(uint16_t addr, uint8_t cycle_count);
-    void RTS(uint16_t addr, uint8_t cycle_count);
+    void RTI(uint8_t cycle_count);
+    void RTS(uint8_t cycle_count);
 
     void SBC(uint16_t addr, uint8_t cycle_count);
     void SEC(uint8_t cycle_count);

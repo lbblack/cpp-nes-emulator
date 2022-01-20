@@ -5,7 +5,9 @@ int main(void)
     nes_cpu cpu;
     cpu.LOAD_TEST_ROM("nestest.nes");
 
-    cpu.step();
+    cout << cpu.step() << endl;
+    cout << cpu.step() << endl;
+    cpu.print_registers();
 
     return 0;
 }
