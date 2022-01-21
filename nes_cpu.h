@@ -71,7 +71,11 @@ public:
 
     // CPU operations
     void ADC(uint16_t addr, uint8_t cycle_count);
+    void ALR(uint16_t addr, uint8_t cycle_count);
+    void ANC(uint16_t addr, uint8_t cycle_count);
     void AND(uint16_t addr, uint8_t cycle_count);
+    void ANE(uint16_t addr, uint8_t cycle_count);
+    void ARR(uint16_t addr, uint8_t cycle_count);
     void ASL(uint16_t addr, uint8_t cycle_count, bool accumulator);
 
     void BCC(uint16_t addr, uint8_t cycle_count);
@@ -93,6 +97,7 @@ public:
     void CPX(uint16_t addr, uint8_t cycle_count);
     void CPY(uint16_t addr, uint8_t cycle_count);
 
+    void DCP(uint16_t addr, uint8_t cycle_count);
     void DEC(uint16_t addr, uint8_t cycle_count);
     void DEX(uint8_t cycle_count);
     void DEY(uint8_t cycle_count);
@@ -102,14 +107,19 @@ public:
     void INC(uint16_t addr, uint8_t cycle_count);
     void INX(uint8_t cycle_count);
     void INY(uint8_t cycle_count);
+    void ISC(uint16_t addr, uint8_t cycle_count);
 
+    void JAM();
     void JMP(uint16_t addr, uint8_t cycle_count, bool is_indirect);
     void JSR(uint16_t addr, uint8_t cycle_count);
 
+    void LAS(uint16_t addr, uint8_t cycle_count);
+    void LAX(uint16_t addr, uint8_t cycle_count);
     void LDA(uint16_t addr, uint8_t cycle_count);
     void LDX(uint16_t addr, uint8_t cycle_count);
     void LDY(uint16_t addr, uint8_t cycle_count);
     void LSR(uint16_t addr, uint8_t cycle_count, bool accumulator);
+    void LXA(uint16_t addr, uint8_t cycle_count);
 
     void NOP(uint8_t cycle_count);
 
@@ -120,25 +130,37 @@ public:
     void PLA(uint8_t cycle_count);
     void PLP(uint8_t cycle_count);
 
+    void RLA(uint16_t addr, uint8_t cycle_count);
     void ROL(uint16_t addr, uint8_t cycle_count, bool accumulator);
     void ROR(uint16_t addr, uint8_t cycle_count, bool accumulator);
+    void RRA(uint16_t addr, uint8_t cycle_count);
     void RTI(uint8_t cycle_count);
     void RTS(uint8_t cycle_count);
 
+    void SAX(uint16_t addr, uint8_t cycle_count);
     void SBC(uint16_t addr, uint8_t cycle_count);
+    void SBX(uint16_t addr, uint8_t cycle_count);
     void SEC(uint8_t cycle_count);
     void SED(uint8_t cycle_count);
     void SEI(uint8_t cycle_count);
+    void SHA(uint16_t addr, uint8_t cycle_count);
+    void SHX(uint16_t addr, uint8_t cycle_count);
+    void SHY(uint16_t addr, uint8_t cycle_count);
+    void SLO(uint16_t addr, uint8_t cycle_count);
+    void SRE(uint16_t addr, uint8_t cycle_count);
     void STA(uint16_t addr, uint8_t cycle_count);
     void STX(uint16_t addr, uint8_t cycle_count);
     void STY(uint16_t addr, uint8_t cycle_count);
 
+    void TAS(uint16_t addr, uint8_t cycle_count);
     void TAX(uint8_t cycle_count);
     void TAY(uint8_t cycle_count);
     void TSX(uint8_t cycle_count);
     void TXA(uint8_t cycle_count);
     void TXS(uint8_t cycle_count);
     void TYA(uint8_t cycle_count);
+
+    void USBC(uint16_t addr, uint8_t cycle_count);
 
     void execute_implied_instruction(
         void (nes_cpu::*opcode_function)(uint8_t),

@@ -141,6 +141,23 @@ void nes_cpu::ADC(uint16_t addr, uint8_t cycle_count)
 
 }
 
+void nes_cpu::ALR(uint16_t addr, uint8_t cycle_count)
+{
+    cycles += cycle_count;
+
+    AND(addr, 0);
+    LSR(-1, 0, true);
+}
+
+void nes_cpu::ANC(uint16_t addr, uint8_t cycle_count)
+{
+    cycles += cycle_count;
+
+    AND(addr, 0);
+    uint16_t carry = (A & 0x80) >> 7;
+    P |= carry;
+}
+
 void nes_cpu::AND(uint16_t addr, uint8_t cycle_count)
 {
     cycles += cycle_count;
@@ -149,6 +166,23 @@ void nes_cpu::AND(uint16_t addr, uint8_t cycle_count)
     // check the negative and zero flag
     P |= A & 0x80;
     P |= (A == 0) << 1;
+}
+
+// highly unstable
+void nes_cpu::ANE(uint16_t addr, uint8_t cycle_count)
+{
+    cycles += cycle_count;
+
+    A &= X;
+    A &= 0;
+}
+
+void nes_cpu::ARR(uint16_t addr, uint8_t cycle_count)
+{
+    cycles += cycle_count;
+
+    AND(addr, 0);
+    ROR(-1, 0, true);
 }
 
 void nes_cpu::ASL(uint16_t addr, uint8_t cycle_count, bool accumulator)
@@ -369,6 +403,14 @@ void nes_cpu::CPY(uint16_t addr, uint8_t cycle_count)
     P |= (Y & 0x80);
 }
 
+void nes_cpu::DCP(uint16_t addr, uint8_t cycle_count)
+{
+    cycles += cycle_count;
+
+    DEC(addr, 0);
+    CMP(addr, 0);
+}
+
 void nes_cpu::DEC(uint16_t addr, uint8_t cycle_count)
 {
     cycles += cycle_count;
@@ -461,6 +503,19 @@ void nes_cpu::INY(uint8_t cycle_count)
     P |= (Y & 0x80);
 }
 
+void nes_cpu::ISC(uint16_t addr, uint8_t cycle_count)
+{
+    cycles += cycle_count;
+
+    INC(addr, 0);
+    SBC(addr, 0);
+}
+
+void nes_cpu::JAM()
+{
+    while(true) {}
+}
+
 void nes_cpu::JMP(uint16_t addr, uint8_t cycle_count, bool is_indirect)
 {
     cycles += cycle_count;
@@ -491,6 +546,30 @@ void nes_cpu::JSR(uint16_t addr, uint8_t cycle_count)
     // Program Counter = (xxxx xxxx 0000 0000) & (0000 0000 xxxx xxxx)
     uint16_t jump_address = get_indirect(addr);
     PC = jump_address;
+}
+
+void nes_cpu::LAS(uint16_t addr, uint8_t cycle_count)
+{
+    cycles += cycle_count;
+
+    uint8_t value = read_mem_from_address(addr);
+    value &= SP;
+    A = value;
+    X = value;
+    Y = value;
+
+    // check the negative flag
+    P |= (value & 0x80);
+    // check the zero flag
+    P |= (value == 0) << 1;
+}
+
+void nes_cpu::LAX(uint16_t addr, uint8_t cycle_count)
+{
+    cycles += cycle_count;
+
+    LDA(addr, 0);
+    LDX(addr, 0);
 }
 
 void nes_cpu::LDA(uint16_t addr, uint8_t cycle_count)
@@ -567,6 +646,15 @@ void nes_cpu::LSR(uint16_t addr, uint8_t cycle_count, bool accumulator)
     P &= 0x7F;
 }
 
+// highly unstable
+void nes_cpu::LXA(uint16_t addr, uint8_t cycle_count)
+{
+    cycles += cycle_count;
+
+    AND(addr, 0);
+    X = A;
+}
+
 void nes_cpu::NOP(uint8_t cycle_count)
 {
     cycles += cycle_count;
@@ -614,6 +702,14 @@ void nes_cpu::PLP(uint8_t cycle_count)
 
     // load the status register from the stack
     P = pop_value_from_stack();
+}
+
+void nes_cpu::RLA(uint16_t addr, uint8_t cycle_count)
+{
+    cycles += cycle_count;
+
+    ROL(addr, 0, false);
+    AND(addr, 0);
 }
 
 void nes_cpu::ROL(uint16_t addr, uint8_t cycle_count, bool accumulator)
@@ -674,6 +770,14 @@ void nes_cpu::ROR(uint16_t addr, uint8_t cycle_count, bool accumulator)
     P |= carry;
 }
 
+void nes_cpu::RRA(uint16_t addr, uint8_t cycle_count)
+{
+    cycles += cycle_count;
+
+    ROR(addr, 0, false);
+    ADC(addr, 0);
+}
+
 void nes_cpu::RTI(uint8_t cycle_count)
 {
     cycles += cycle_count;
@@ -698,9 +802,38 @@ void nes_cpu::RTS(uint8_t cycle_count)
     PC = (low_nibble << 8) & high_nibble;
 }
 
+void nes_cpu::SAX(uint16_t addr, uint8_t cycle_count)
+{
+    cycles += cycle_count;
+
+    uint8_t result = A & X;
+    write_mem_to_address(result, addr);
+}
+
 void nes_cpu::SBC(uint16_t addr, uint8_t cycle_count)
 {
 
+}
+
+void nes_cpu::SBX(uint16_t addr, uint8_t cycle_count)
+{
+    cycles += cycle_count;
+
+    uint8_t value = read_mem_from_address(addr);
+    uint8_t result = (A & X);
+    bool carry = (result >= value);
+
+    P |= carry;
+    // check the zero flag
+    if (result == value) {
+        P |= 0x2;
+    }
+    // check the negative flag
+    if (result >= 0x80) {
+        P |= 0x80;
+    }
+
+    DEX(0);
 }
 
 void nes_cpu::SEC(uint8_t cycle_count)
@@ -724,6 +857,49 @@ void nes_cpu::SEI(uint8_t cycle_count)
     P |= 0x4;
 }
 
+void nes_cpu::SHA(uint16_t addr, uint8_t cycle_count)
+{
+    cycles += cycle_count;
+
+    uint8_t high_nibble = 0xFF & (addr + 1);
+    uint8_t value = A & X & high_nibble;
+    write_mem_to_address(value, addr);
+}
+
+void nes_cpu::SHX(uint16_t addr, uint8_t cycle_count)
+{
+    cycles += cycle_count;
+
+    uint8_t high_nibble = 0xFF & (addr + 1);
+    uint8_t value = X & high_nibble;
+    write_mem_to_address(value, addr);
+}
+
+void nes_cpu::SHY(uint16_t addr, uint8_t cycle_count)
+{
+    cycles += cycle_count;
+
+    uint8_t high_nibble = 0xFF & (addr + 1);
+    uint8_t value = Y & high_nibble;
+    write_mem_to_address(value, addr);
+}
+
+void nes_cpu::SLO(uint16_t addr, uint8_t cycle_count)
+{
+    cycles += cycle_count;
+
+    ASL(addr, 0, false);
+    ORA(addr, 0);
+}
+
+void nes_cpu::SRE(uint16_t addr, uint8_t cycle_count)
+{
+    cycles += cycle_count;
+
+    LSR(addr, 0, false);
+    EOR(addr, 0);
+}
+
 void nes_cpu::STA(uint16_t addr, uint8_t cycle_count)
 {
     cycles += cycle_count;
@@ -743,6 +919,14 @@ void nes_cpu::STY(uint16_t addr, uint8_t cycle_count)
     cycles += cycle_count;
     // write the accumulator to memory
     write_mem_to_address(Y, addr);
+}
+
+void nes_cpu::TAS(uint16_t addr, uint8_t cycle_count)
+{
+    cycles += cycle_count;
+
+    SP = A & X;
+    SHA(addr, 0);
 }
 
 void nes_cpu::TAX(uint8_t cycle_count)
@@ -785,6 +969,12 @@ void nes_cpu::TYA(uint8_t cycle_count)
     cycles += cycle_count;
     // transfer Y to the accumulator
     A = Y;
+}
+
+void nes_cpu::USBC(uint16_t addr, uint8_t cycle_count)
+{
+    cycles += cycle_count;
+    SBC(addr, 0);
 }
 
 void nes_cpu::execute_implied_instruction(void (nes_cpu::*opcode_function)(uint8_t),
@@ -872,6 +1062,15 @@ bool nes_cpu::step()
             execute_instruction(&nes_cpu::ADC, &nes_cpu::get_indirect_y, 2, 5);
             break;
 
+        case 0x4B:
+            execute_instruction(&nes_cpu::ALR, &nes_cpu::get_immediate, 2, 2);
+            break;
+
+        case 0x0B:
+        case 0x2B:
+            execute_instruction(&nes_cpu::ANC, &nes_cpu::get_immediate, 2, 2);
+            break;
+
         case 0x29:
             execute_instruction(&nes_cpu::AND, &nes_cpu::get_immediate, 2, 2);
             break;
@@ -898,6 +1097,14 @@ bool nes_cpu::step()
         case 0x31:
             // todo: add another cycle on page boundry cross
             execute_instruction(&nes_cpu::AND, &nes_cpu::get_indirect_y, 2, 5);
+            break;
+
+        case 0x8B:
+            execute_instruction(&nes_cpu::ANE, &nes_cpu::get_immediate, 2, 2);
+            break;
+
+        case 0x6B:
+            execute_instruction(&nes_cpu::ARR, &nes_cpu::get_immediate, 2, 2);
             break;
 
         case 0x0A:
@@ -1035,6 +1242,28 @@ bool nes_cpu::step()
             execute_instruction(&nes_cpu::CPY, &nes_cpu::get_absolute, 3, 4);
             break;
 
+        case 0xC7:
+            execute_instruction(&nes_cpu::DCP, &nes_cpu::get_zeropage, 2, 5);
+            break;
+        case 0xD7:
+            execute_instruction(&nes_cpu::DCP, &nes_cpu::get_zeropage_x, 2, 6);
+            break;
+        case 0xCF:
+            execute_instruction(&nes_cpu::DCP, &nes_cpu::get_absolute, 3, 6);
+            break;
+        case 0xDF:
+            execute_instruction(&nes_cpu::DCP, &nes_cpu::get_absolute_x, 3, 7);
+            break;
+        case 0xDB:
+            execute_instruction(&nes_cpu::DCP, &nes_cpu::get_absolute_y, 3, 7);
+            break;
+        case 0xC3:
+            execute_instruction(&nes_cpu::DCP, &nes_cpu::get_indirect_x, 2, 8);
+            break;
+        case 0xD3:
+            execute_instruction(&nes_cpu::DCP, &nes_cpu::get_indirect_y, 2, 8);
+            break;
+
         case 0xC6:
             execute_instruction(&nes_cpu::DEC, &nes_cpu::get_zeropage, 2, 5);
             break;
@@ -1105,6 +1334,42 @@ bool nes_cpu::step()
             execute_implied_instruction(&nes_cpu::INY, 2);
             break;
 
+        case 0xE7:
+            execute_instruction(&nes_cpu::ISC, &nes_cpu::get_zeropage, 2, 5);
+            break;
+        case 0xF7:
+            execute_instruction(&nes_cpu::ISC, &nes_cpu::get_zeropage_x, 2, 6);
+            break;
+        case 0xEF:
+            execute_instruction(&nes_cpu::ISC, &nes_cpu::get_absolute, 3, 6);
+            break;
+        case 0xFF:
+            execute_instruction(&nes_cpu::ISC, &nes_cpu::get_absolute_x, 3, 7);
+            break;
+        case 0xFB:
+            execute_instruction(&nes_cpu::ISC, &nes_cpu::get_absolute_y, 3, 7);
+            break;
+        case 0xE3:
+            execute_instruction(&nes_cpu::ISC, &nes_cpu::get_indirect_x, 2, 8);
+            break;
+        case 0xF3:
+            execute_instruction(&nes_cpu::ISC, &nes_cpu::get_indirect_y, 2, 4);
+            break;
+
+        case 0x02:
+        case 0x12:
+        case 0x22:
+        case 0x32:
+        case 0x42:
+        case 0x52:
+        case 0x62:
+        case 0x72:
+        case 0x92:
+        case 0xB2:
+        case 0xD2:
+        case 0xF2:
+            JAM();
+
         case 0x4C:
             execute_instruction_with_bool_and_address(
                 &nes_cpu::JMP, &nes_cpu::get_absolute, 3, 3, false);
@@ -1116,6 +1381,32 @@ bool nes_cpu::step()
 
         case 0x20:
             execute_instruction(&nes_cpu::JSR, &nes_cpu::get_absolute, 3, 6);
+            break;
+
+        case 0xBB:
+            // todo: add cycles on page boundry cross
+            execute_instruction(&nes_cpu::LAS, &nes_cpu::get_absolute_y, 3, 4);
+            break;
+
+        case 0xA7:
+            execute_instruction(&nes_cpu::LAX, &nes_cpu::get_zeropage, 2, 3);
+            break;
+        case 0xB7:
+            execute_instruction(&nes_cpu::LAX, &nes_cpu::get_zeropage_y, 2, 4);
+            break;
+        case 0xAF:
+            execute_instruction(&nes_cpu::LAX, &nes_cpu::get_absolute, 3, 4);
+            break;
+        case 0xBF:
+            // todo: add cycle on page boundry cross
+            execute_instruction(&nes_cpu::LAX, &nes_cpu::get_absolute_y, 3, 4);
+            break;
+        case 0xA3:
+            execute_instruction(&nes_cpu::LAX, &nes_cpu::get_indirect_x, 2, 6);
+            break;
+        case 0xB3:
+            // todo: add cycle on page boundry cross
+            execute_instruction(&nes_cpu::LAX, &nes_cpu::get_indirect_y, 2, 5);
             break;
 
         case 0xA9:
@@ -1200,8 +1491,54 @@ bool nes_cpu::step()
                 &nes_cpu::LSR, &nes_cpu::get_absolute_x, 3, 7, false);
             break;
 
+        case 0xAB:
+            execute_instruction(&nes_cpu::LXA, &nes_cpu::get_immediate, 2, 2);
+            break;
+
+        case 0x1A:
+        case 0x3A:
+        case 0x5A:
+        case 0x7A:
+        case 0xDA:
+        case 0xFA:
         case 0xEA:
             execute_implied_instruction(&nes_cpu::NOP, 2);
+            break;
+        case 0x80:
+        case 0x82:
+        case 0x89:
+        case 0xC2:
+        case 0xE2:
+            execute_implied_instruction(&nes_cpu::NOP, 2);
+            PC++;
+            break;
+        case 0x04:
+        case 0x44:
+        case 0x64:
+            execute_implied_instruction(&nes_cpu::NOP, 3);
+            PC++;
+            break;
+        case 0x14:
+        case 0x34:
+        case 0x54:
+        case 0x74:
+        case 0xD4:
+        case 0xF4:
+            execute_implied_instruction(&nes_cpu::NOP, 4);
+            PC++;
+            break;
+        case 0x0C:
+            execute_implied_instruction(&nes_cpu::NOP, 4);
+            PC += 2;
+            break;
+        case 0x1C:
+        case 0x3C:
+        case 0x5C:
+        case 0x7C:
+        case 0xDC:
+        case 0xFC:
+            execute_implied_instruction(&nes_cpu::NOP, 4);
+            PC += 2;
             break;
 
         case 0x09:
@@ -1249,6 +1586,28 @@ bool nes_cpu::step()
             execute_implied_instruction(&nes_cpu::PLP, 4);
             break;
 
+        case 0x27:
+            execute_instruction(&nes_cpu::RLA, &nes_cpu::get_zeropage, 2, 5);
+            break;
+        case 0x37:
+            execute_instruction(&nes_cpu::RLA, &nes_cpu::get_zeropage_x, 2, 6);
+            break;
+        case 0x2F:
+            execute_instruction(&nes_cpu::RLA, &nes_cpu::get_absolute, 3, 6);
+            break;
+        case 0x3F:
+            execute_instruction(&nes_cpu::RLA, &nes_cpu::get_absolute_x, 3, 7);
+            break;
+        case 0x3B:
+            execute_instruction(&nes_cpu::RLA, &nes_cpu::get_absolute_y, 3, 7);
+            break;
+        case 0x23:
+            execute_instruction(&nes_cpu::RLA, &nes_cpu::get_indirect_x, 2, 8);
+            break;
+        case 0x33:
+            execute_instruction(&nes_cpu::RLA, &nes_cpu::get_indirect_y, 2, 8);
+            break;
+
         case 0x2A:
             execute_instruction_with_bool(&nes_cpu::ROL, 1, 2, true);
             break;
@@ -1289,6 +1648,28 @@ bool nes_cpu::step()
                 &nes_cpu::ROR, &nes_cpu::get_absolute_x, 3, 7, false);
             break;
 
+        case 0x67:
+            execute_instruction(&nes_cpu::RRA, &nes_cpu::get_zeropage, 2, 5);
+            break;
+        case 0x77:
+            execute_instruction(&nes_cpu::RRA, &nes_cpu::get_zeropage_x, 2, 6);
+            break;
+        case 0x6F:
+            execute_instruction(&nes_cpu::RRA, &nes_cpu::get_absolute, 3, 6);
+            break;
+        case 0x7F:
+            execute_instruction(&nes_cpu::RRA, &nes_cpu::get_absolute_x, 3, 7);
+            break;
+        case 0x7B:
+            execute_instruction(&nes_cpu::RRA, &nes_cpu::get_absolute_y, 3, 7);
+            break;
+        case 0x63:
+            execute_instruction(&nes_cpu::RRA, &nes_cpu::get_indirect_x, 2, 8);
+            break;
+        case 0x73:
+            execute_instruction(&nes_cpu::RRA, &nes_cpu::get_indirect_y, 2, 8);
+            break;
+
         case 0x40:
             execute_implied_instruction(&nes_cpu::RTI, 6);
             break;
@@ -1296,6 +1677,22 @@ bool nes_cpu::step()
         case 0x60:
             execute_implied_instruction(&nes_cpu::RTS, 6);
             break;
+
+        case 0x87:
+            execute_instruction(&nes_cpu::SAX, &nes_cpu::get_zeropage, 2, 3);
+            break;
+        case 0x97:
+            execute_instruction(&nes_cpu::SAX, &nes_cpu::get_zeropage_y, 2, 4);
+            break;
+        case 0x8F:
+            execute_instruction(&nes_cpu::SAX, &nes_cpu::get_absolute, 3, 4);
+            break;
+        case 0x83:
+            execute_instruction(&nes_cpu::SAX, &nes_cpu::get_indirect_x, 2, 6);
+            break;
+
+        case 0xCB:
+            execute_instruction(&nes_cpu::SBX, &nes_cpu::get_immediate, 2, 2);
 
         case 0xE9:
             execute_instruction(&nes_cpu::SBC, &nes_cpu::get_immediate, 2, 2);
@@ -1335,6 +1732,65 @@ bool nes_cpu::step()
 
         case 0x78:
             execute_implied_instruction(&nes_cpu::SEI, 2);
+            break;
+
+        case 0x9F:
+            execute_instruction(&nes_cpu::SHA, &nes_cpu::get_absolute_y, 3, 5);
+            break;
+        case 0x93:
+            execute_instruction(&nes_cpu::SHA, &nes_cpu::get_indirect_y, 2, 6);
+            break;
+
+        case 0x9E:
+            execute_instruction(&nes_cpu::SHX, &nes_cpu::get_absolute_y, 3, 5);
+            break;
+
+        case 0x9C:
+            execute_instruction(&nes_cpu::SHY, &nes_cpu::get_absolute_x, 3, 5);
+            break;
+
+        case 0x07:
+            execute_instruction(&nes_cpu::SLO, &nes_cpu::get_zeropage, 2, 5);
+            break;
+        case 0x17:
+            execute_instruction(&nes_cpu::SLO, &nes_cpu::get_zeropage_x, 2, 6);
+            break;
+        case 0x0F:
+            execute_instruction(&nes_cpu::SLO, &nes_cpu::get_absolute, 3, 6);
+            break;
+        case 0x1F:
+            execute_instruction(&nes_cpu::SLO, &nes_cpu::get_absolute_x, 3, 7);
+            break;
+        case 0x1B:
+            execute_instruction(&nes_cpu::SLO, &nes_cpu::get_absolute_y, 3, 7);
+            break;
+        case 0x03:
+            execute_instruction(&nes_cpu::SLO, &nes_cpu::get_indirect_x, 2, 8);
+            break;
+        case 0x13:
+            execute_instruction(&nes_cpu::SLO, &nes_cpu::get_indirect_y, 2, 8);
+            break;
+
+        case 0x47:
+            execute_instruction(&nes_cpu::SRE, &nes_cpu::get_zeropage, 2, 5);
+            break;
+        case 0x57:
+            execute_instruction(&nes_cpu::SRE, &nes_cpu::get_zeropage_x, 2, 6);
+            break;
+        case 0x4F:
+            execute_instruction(&nes_cpu::SRE, &nes_cpu::get_absolute, 3, 6);
+            break;
+        case 0x5F:
+            execute_instruction(&nes_cpu::SRE, &nes_cpu::get_absolute_x, 3, 7);
+            break;
+        case 0x5B:
+            execute_instruction(&nes_cpu::SRE, &nes_cpu::get_absolute_y, 3, 7);
+            break;
+        case 0x43:
+            execute_instruction(&nes_cpu::SRE, &nes_cpu::get_indirect_x, 2, 8);
+            break;
+        case 0x53:
+            execute_instruction(&nes_cpu::SRE, &nes_cpu::get_indirect_y, 2, 8);
             break;
 
         case 0x85:
@@ -1379,6 +1835,10 @@ bool nes_cpu::step()
             execute_instruction(&nes_cpu::STY, &nes_cpu::get_absolute, 3, 4);
             break;
 
+        case 0x9B:
+            execute_instruction(&nes_cpu::TAS, &nes_cpu::get_absolute_y, 3, 5);
+            break;
+
         case 0xAA:
             execute_implied_instruction(&nes_cpu::TAX, 2);
             break;
@@ -1402,12 +1862,17 @@ bool nes_cpu::step()
         case 0x98:
             execute_implied_instruction(&nes_cpu::TYA, 2);
             break;
+
+        case 0xEB:
+            execute_instruction(&nes_cpu::USBC, &nes_cpu::get_immediate, 2, 2);
+            break;
         
         default:
             return false;
     }
 
-    cout << hex << (unsigned int) (0xFF & MEM[PC]) << endl;
+    // cout << hex << (unsigned int) (0xFF & MEM[PC]) << endl;
+    print_registers();
 
     return true;
 }

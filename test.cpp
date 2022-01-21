@@ -11,7 +11,9 @@ int main(void)
     // cout << cpu.step() << endl;
     // cpu.print_registers();
 
-    cpu.step();
+    for (int i = 0; i < 100; i++) {
+        cpu.step();
+    }
 
     return 0;
 }
